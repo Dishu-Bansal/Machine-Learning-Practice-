@@ -1,8 +1,10 @@
 from sklearn.datasets import make_circles
 import pandas as pd
+from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
+import itertools
 
 
 n = 1000
@@ -47,18 +49,64 @@ model = tf.keras.Sequential([
     tf.keras.layers.Dense(1, activation="sigmoid")
     ])
 
-model.compile(loss=tf.keras.losses.binary_crossentropy,
-              optimizer=tf.keras.optimizers.Adam(),
-              metrics=["accuracy"])
+lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: 1e-4 * 10**(epoch/20))
 
-model.fit(X_train, y_train, epochs=200)
+model.compile(loss=tf.keras.losses.binary_crossentropy,
+              optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
+              metrics=["accuracy"],)
+
+history = model.fit(X_train, y_train, epochs=40, callbacks=[lr_scheduler])
 
 model.evaluate(X_test, y_test)
 
-plt.figure(figsize=(12,6))
-plt.subplot(1,2,1)
-plt.title("Train")
-plot_decision_boundary(model, X=X_train, y=y_train)
-plt.subplot(1,2,2)
-plot_decision_boundary(model, X=X_test, y=y_test)
+# lrs = 1e-4 * (10 ** (tf.range(40)/20))
+# plt.figure(figsize=(10,7))
+# plt.semilogx(lrs, history.history["loss"])
+# plt.xlabel("Learning Rate")
+# plt.ylabel("Loss")
+
+y_preds =  model.predict(X_test)
+
+print(confusion_matrix(y_test, tf.round(y_preds)))
+
+figsize=(10, 10)
+
+cm = confusion_matrix(y_test, tf.round(y_preds))
+cm_norm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+n_classes = cm.shape[0]
+
+fig, ax = plt.subplots(figsize=figsize)
+
+cax = ax.matshow(cm, cmap=plt.cm.Blues)
+fig.colorbar(cax)
+
+classes = False
+
+if classes:
+    labels = classes
+else:
+    labels = np.arange(cm.shape[0])
+
+ax.set(title="Confusion Matrix",
+       xlabel="Predicted Label",
+       ylabel="True Label",
+       xticks=np.arange(n_classes),
+       yticks=np.arange(n_classes),
+       xticklabels=labels,
+       yticklabels=labels)
+
+threshhold = (cm.max() + cm.min()) /2
+
+for i,j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+    plt.text(j,i, f"{cm[i,j]} ({cm_norm[i,j]*100:.1f})",
+             horizontalalignment="center",
+             color="white" if cm[i,j] > threshhold else "black",
+             size=15)
+# plt.figure(figsize=(12,6))
+# plt.subplot(1,2,1)
+# plt.title("Train")
+# plot_decision_boundary(model, X=X_train, y=y_train)
+# plt.subplot(1,2,2)
+# plot_decision_boundary(model, X=X_test, y=y_test)
+# pd.DataFrame(history.history).plot()
 plt.show()
